@@ -1,11 +1,14 @@
-#include <iostream>
-#include <thread>
+//
+// Created by alexander on 5/24/21.
+//
+
+#ifndef MATRICES_MATRIX_H
+#define MATRICES_MATRIX_H
+
 #include <vector>
 #include <string>
 #include <fstream>
 #include <sstream>
-
-const unsigned N = 8;
 
 class Matrix {
 public:
@@ -73,7 +76,7 @@ class BlockedMatrix {
 public:
     struct Block;
     BlockedMatrix(const Matrix& m, unsigned blockNumRows, unsigned  blockNumColumns): _blockNumRows(blockNumRows), _blockNumColumns(blockNumColumns),
-    _numColumns(m.GetNumColumns()/blockNumColumns), _numRows(m.GetNumRows()/_blockNumRows) {
+                                                                                      _numColumns(m.GetNumColumns()/blockNumColumns), _numRows(m.GetNumRows()/_blockNumRows) {
         _data = std::vector<std::vector<Block>>(_numRows, std::vector<Block>(_numColumns, Block(_blockNumRows, _blockNumColumns)));
         for (unsigned i = 0; i < m.GetNumRows(); i++) {
             for (unsigned j = 0; j < m.GetNumColumns(); j++) {
@@ -125,11 +128,5 @@ private:
     const unsigned _blockNumColumns, _blockNumRows, _numColumns, _numRows;
 };
 
-int main() {
-    Matrix a(16, 16), b(16, 16);
-    a.ReadFromFile("m1.txt");
-    BlockedMatrix aBlocked(a, N, N);
-    b.ReadFromBlockedMatrix(aBlocked);
-    std::cout << b << std::endl;
-    return 0;
-}
+
+#endif //MATRICES_MATRIX_H
