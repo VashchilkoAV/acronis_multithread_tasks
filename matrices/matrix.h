@@ -22,6 +22,10 @@ public:
         return _data;
     }
 
+    std::vector<std::vector<int>>& GetData() {
+        return _data;
+    }
+
     unsigned GetNumColumns() const{
         return _numColumns;
     }
@@ -48,6 +52,10 @@ private:
         Block(unsigned numRows, unsigned numColumns) : _numRows(numRows), _numColumns(numColumns), _data(std::vector<int>(numRows*_numColumns, 0)){}
 
         int& GetByIndex(unsigned RowNum, unsigned ColumnNum) {
+            return _data[RowNum*_numColumns+ColumnNum];
+        }
+
+        const int& GetByIndex(unsigned RowNum, unsigned ColumnNum) const{
             return _data[RowNum*_numColumns+ColumnNum];
         }
 
@@ -79,6 +87,10 @@ public:
     }
 
     const std::vector<std::vector<Block>>& GetData() const{
+        return _data;
+    }
+
+    std::vector<std::vector<Block>>& GetData() {
         return _data;
     }
 };
