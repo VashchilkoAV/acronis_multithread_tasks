@@ -1,5 +1,8 @@
 #include <iostream>
 #include <atomic>
+#include <vector>
+
+constexpr unsigned THREADS_COUNT = 4;
 
 struct Node{
     std::atomic<Node*> prev;
@@ -11,9 +14,37 @@ struct Node{
 
 class HPGuard{
 public:
+    HPGuard(){}
+    const unsigned limit = THREADS_COUNT+1;
     Node * Protect(Node* node) {
-        return node;
+        localStorage.HP[0].store(node);
+        return localStorage.HP[0].load();
     };
+
+    void RetireNode(Node * node) {
+
+    }
+
+private:
+    std::atomic<unsigned > index;
+    std::vector<std::atomic<Node*>> storage;
+    static thread_local class HPlocalStorage{
+    public:
+        HPlocalStorage() :
+        _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1),
+        _dcount(0), _dlist(std::vector<Node*>(THREADS_COUNT+1)), HP(std::vector<std::atomic<Node*>>(1)) {}
+
+        unsigned _numThreads;
+        unsigned _maxHPcount;
+        unsigned _HPcount;
+        unsigned _batchSize;
+
+        std::vector<std::atomic<Node*>> HP;
+        std::vector<Node*> _dlist;
+        unsigned _dcount;
+    } localStorage;
+
+
 };
 
 class Backoff{
@@ -42,6 +73,10 @@ public:
 
 class Stack{
 public:
+    Stack() {
+        _top.store(nullptr);
+    }
+
     bool Push(int value) {
         Node* oldTop = _top.load(std::memory_order_relaxed);
         Node* newNode = new Node(value);
@@ -57,7 +92,7 @@ public:
     }
 
     int Pop() {
-        HPGuard guard;
+        HPGuard guard();
         Backoff backoff;
         while(true) {
             Node * oldTop = guard.Protect(_top.load());
@@ -85,6 +120,9 @@ int main() {
     stack.Push(1);
     stack.Push(2);
     stack.Push(3);
+    std::cout << stack.Pop() <<"\n";
+    std::cout << stack.Pop() <<"\n";
+    std::cout << stack.Pop() <<"\n";
     std::cout << stack.Pop() <<"\n";
     std::cout << stack.Pop() <<"\n";
     std::cout << "Hello, World!" << std::endl;
