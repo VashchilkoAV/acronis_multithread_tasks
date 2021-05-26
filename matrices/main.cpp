@@ -6,13 +6,13 @@
 #include <sstream>
 #include "matrix.h"
 
-const unsigned N = 8;
+const unsigned N = 1;
 
 int main() {
-    Matrix a(16, 16), b(16, 16);
-    a.ReadFromFile("m1.txt");
-    BlockedMatrix aBlocked(a, N, N);
-    b.ReadFromBlockedMatrix(aBlocked);
-    std::cout << b << std::endl;
+    Matrix a(3, 3), b(3, 3);
+    a.ReadFromFile("m2.txt");
+    b.ReadFromFile("m2.txt");
+    Matrix c = Multiply(a, b, 1, N, N, N, N);
+    std::cout << c << std::endl;
     return 0;
 }

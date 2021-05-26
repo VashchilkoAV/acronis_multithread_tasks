@@ -41,8 +41,20 @@ std::ostream& operator<<(std::ostream &out, const Matrix & m) {
     return out;
 }
 
-BlockedMatrix::BlockedMatrix(const Matrix& m, unsigned blockNumRows, unsigned  blockNumColumns): _blockNumRows(blockNumRows), _blockNumColumns(blockNumColumns),
-                                                                                  _numColumns(m.GetNumColumns()/blockNumColumns), _numRows(m.GetNumRows()/_blockNumRows) {
+Matrix Multiply(const Matrix &left, const Matrix &right, unsigned int numThreads, unsigned leftBlockNumRows, unsigned leftBlockNumColumns, unsigned rightBlockNumRows, unsigned rightBlockNumColumns) {
+    Matrix result(left.GetNumRows(), right.GetNumColumns());
+    BlockedMatrix lBlocked(left, leftBlockNumRows, leftBlockNumColumns), rBlocked(right, rightBlockNumRows, rightBlockNumColumns);
+    BlockedMatrix res = Multiply(lBlocked, rBlocked, numThreads);
+    result.ReadFromBlockedMatrix(res);
+    return result;
+}
+
+BlockedMatrix::BlockedMatrix(const Matrix& m, unsigned blockNumRows, unsigned  blockNumColumns):
+_blockNumRows(blockNumRows),
+_blockNumColumns(blockNumColumns),
+_numColumns(m.GetNumColumns() % blockNumColumns == 0 ? m.GetNumColumns()/blockNumColumns : m.GetNumColumns()/blockNumColumns+1),
+_numRows(m.GetNumRows() % blockNumRows == 0 ? m.GetNumRows()/_blockNumRows : m.GetNumRows()/_blockNumRows+1)
+{
     _data = std::vector<std::vector<Block>>(_numRows, std::vector<Block>(_numColumns, Block(_blockNumRows, _blockNumColumns)));
     for (unsigned i = 0; i < m.GetNumRows(); i++) {
         for (unsigned j = 0; j < m.GetNumColumns(); j++) {
@@ -51,7 +63,7 @@ BlockedMatrix::BlockedMatrix(const Matrix& m, unsigned blockNumRows, unsigned  b
     }
 }
 
-BlockedMatrix::Block BlockedMatrix::Block::Transpose() {
+Block Block::Transpose() {
     Block transposed(_numColumns, _numRows);
     for (unsigned i = 0; i < _numRows; i++) {
         for (unsigned j = 0; j < _numColumns; j++) {
@@ -60,3 +72,51 @@ BlockedMatrix::Block BlockedMatrix::Block::Transpose() {
     }
     return transposed;
 }
+
+Block operator+(const Block &left, const Block &right) {
+    Block result(left._numRows,left._numColumns);
+    for (unsigned i = 0; i < result._numRows; i++) {
+        for (unsigned j = 0; j < result._numColumns; j++) {
+            result.GetByIndex(i, j) = left.GetByIndex(i, j) + right.GetByIndex(i, j);
+        }
+    }
+    return result;
+}
+
+Block &Block::operator+=(const Block &operand) {
+    for (unsigned i = 0; i < _numRows; i++) {
+        for (unsigned j = 0; j < _numColumns; j++) {
+            GetByIndex(i, j) += operand.GetByIndex(i, j);
+        }
+    }
+    return *this;
+}
+
+Block operator*(const Block &left, const Block &right) {
+    Block result(left._numRows, left._numColumns);
+    int tmp;
+    for (unsigned i = 0; i < left._numRows; i++) {
+        for (unsigned k = 0; k < left._numColumns; k++) {
+            tmp = left.GetByIndex(i, k);
+            for (unsigned j = 0; j < left._numColumns; j++) {
+                result.GetByIndex(i, j) += tmp*right.GetByIndex(k, j);
+            }
+        }
+    }
+    return result;
+}
+
+BlockedMatrix Multiply(const BlockedMatrix &left, const BlockedMatrix &right, unsigned int numThreads) {
+    BlockedMatrix result(left._numRows, right._numColumns, left._blockNumRows, right._blockNumColumns);
+    Block tmp(left._numRows, left._numColumns);
+    for (unsigned i = 0; i < left._numRows; i++) {
+        for (unsigned k = 0; k < left._numColumns; k++) {
+            tmp = left._data[i][k];
+            for (unsigned j = 0; j < left._numColumns; j++) {
+                result._data[i][j] += tmp*right._data[k][j];
+            }
+        }
+    }
+    return result;
+}
+
