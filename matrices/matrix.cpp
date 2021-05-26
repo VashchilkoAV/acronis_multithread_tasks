@@ -108,15 +108,22 @@ Block operator*(const Block &left, const Block &right) {
 
 BlockedMatrix Multiply(const BlockedMatrix &left, const BlockedMatrix &right, unsigned int numThreads) {
     BlockedMatrix result(left._numRows, right._numColumns, left._blockNumRows, right._blockNumColumns);
-    Block tmp(left._numRows, left._numColumns);
-    for (unsigned i = 0; i < left._numRows; i++) {
-        for (unsigned k = 0; k < left._numColumns; k++) {
-            tmp = left._data[i][k];
-            for (unsigned j = 0; j < left._numColumns; j++) {
-                result._data[i][j] += tmp*right._data[k][j];
+    auto job = [&](unsigned first, unsigned last) {
+        Block tmp(left._numRows, left._numColumns);
+        for (unsigned i = first; i < last; i++) {
+            for (unsigned k = 0; k < left._numColumns; k++) {
+                tmp = left._data[i][k];
+                for (unsigned j = 0; j < left._numColumns; j++) {
+                    result._data[i][j] += tmp*right._data[k][j];
+                }
             }
         }
-    }
+    };
+
+    job(0, 1);
+    //job(1, 2);
+    job(2, 3);
+
     return result;
 }
 
