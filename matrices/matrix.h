@@ -5,10 +5,13 @@
 #ifndef MATRICES_MATRIX_H
 #define MATRICES_MATRIX_H
 
+#include <iostream>
 #include <vector>
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <thread>
+#include <tuple>
 
 class BlockedMatrix;
 
@@ -120,5 +123,7 @@ public:
     friend BlockedMatrix Multiply(const BlockedMatrix& left, const BlockedMatrix& right, unsigned numThreads);
 };
 
+
+std::vector<std::pair<unsigned, unsigned >> MakeRanges(unsigned numRows, unsigned numThreads);
 
 #endif //MATRICES_MATRIX_H

@@ -106,6 +106,20 @@ Block operator*(const Block &left, const Block &right) {
     return result;
 }
 
+std::vector<std::pair<unsigned, unsigned >> MakeRanges(unsigned numRows, unsigned numThreads) {
+    std::vector<std::pair<unsigned, unsigned>> result(numThreads);
+    unsigned delta = numRows % numThreads == 0 ? numRows / numThreads : numRows / numThreads + 1;
+    result.back().first = (numThreads-1)*delta;
+    result.back().second = numRows;
+    unsigned prev = 0;
+    for (unsigned i = 0; i < numThreads-1; i++) {
+        result[i].first = prev;
+        result[i].second = prev+delta;
+        prev += delta;
+    }
+    return result;
+}
+
 BlockedMatrix Multiply(const BlockedMatrix &left, const BlockedMatrix &right, unsigned int numThreads) {
     BlockedMatrix result(left._numRows, right._numColumns, left._blockNumRows, right._blockNumColumns);
     auto job = [&](unsigned first, unsigned last) {
@@ -120,9 +134,29 @@ BlockedMatrix Multiply(const BlockedMatrix &left, const BlockedMatrix &right, un
         }
     };
 
-    job(0, 1);
+    if (numThreads > 1) {
+        std::vector<std::thread> workersPool(numThreads-1);
+        auto ranges = MakeRanges(left._numRows, numThreads);
+
+        for (unsigned i = 0; i < numThreads-1; i++) {
+            workersPool[i] = std::thread(job, ranges[i].first, ranges[i].second);
+        }
+
+        job(ranges.back().first, ranges.back().second);
+
+        for (unsigned i = 0; i < numThreads-1; i++) {
+            if (workersPool[i].joinable()) {
+                workersPool[i].join();
+            }
+        }
+    } else {
+        job(0, left._numRows);
+    }
+
+
+
+    //job(0, 16);
     //job(1, 2);
-    job(2, 3);
 
     return result;
 }
