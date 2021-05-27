@@ -2,6 +2,7 @@
 #include <atomic>
 #include <vector>
 #include <set>
+#include <thread>
 
 constexpr unsigned THREADS_COUNT = 4;
 
@@ -15,9 +16,7 @@ struct Node{
 
 class HPGuard{
 public:
-    HPGuard() : _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1){
-        storage = std::vector<std::atomic<Node*>*>(THREADS_COUNT);
-    }
+    HPGuard() : _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1){    }
     const unsigned limit = THREADS_COUNT+1;
     static Node * Protect(Node* node) {
         localStorage.HP[0].store(node); //todo: implement the way to work with multiple hazard pointers
@@ -67,7 +66,7 @@ public:
         }
     }
 
-private:
+public:
     unsigned _numThreads;
     unsigned _maxHPcount;
     unsigned _HPcount;
@@ -131,9 +130,13 @@ public:
     }
 };
 
+//thread_local HPGuard::HPlocalStorage;
+HPGuard::index(0);
+HPGuard::storage(std::vector<std::atomic<Node*>*>(THREADS_COUNT));
+
 class Stack{
 public:
-    Stack() : guard(HPGuard()){
+    Stack() {
         _top.store(nullptr);
     }
 
@@ -173,6 +176,8 @@ private:
     HPGuard guard;
     std::atomic<Node*> _top;
 };
+
+
 
 int main() {
     Stack stack;
