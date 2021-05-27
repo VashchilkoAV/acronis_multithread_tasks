@@ -202,17 +202,17 @@ int main() {
 
         for (int i = 0; i < 10; ++i) {
             auto item = stack.Pop();
-            //std::cout << item << std::endl;
+            std::cout << item << std::endl;
         }
         for (int i = 0; i < 10; ++i) {
             stack.Push(i);
             auto item = stack.Pop();
-            //std::cout << item << std::endl;
+            std::cout << item << std::endl;
         }
     };
 
 
-    std::vector<std::thread> workers(THREADS_COUNT);
+    std::vector<std::thread> workers(THREADS_COUNT-1);
     int cnt = 0;
     for (auto& worker : workers) {
         worker = std::thread(task, ++cnt);
