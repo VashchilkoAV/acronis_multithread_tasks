@@ -14,7 +14,7 @@ struct Node{
 
 class HPGuard{
 public:
-    HPGuard(){}
+    HPGuard() : _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1){}
     const unsigned limit = THREADS_COUNT+1;
     Node * Protect(Node* node) {
         localStorage.HP[0].store(node);
@@ -22,17 +22,35 @@ public:
     };
 
     void RetireNode(Node * node) {
+        for (unsigned i = 0; i < _batchSize; i++) {
+            if (localStorage._dlist[i].load() == nullptr) {
+                localStorage._dlist[i].store(node);
+                break;
+            }
+        }
+        localStorage._dcount++;
+        if (localStorage._dcount == _batchSize) {
 
+        }
     }
 
 private:
-    std::atomic<unsigned > index;
-    std::vector<std::atomic<Node*>> storage;
+    unsigned _numThreads;
+    unsigned _maxHPcount;
+    unsigned _HPcount;
+    unsigned _batchSize;
+
+
+    static std::atomic<unsigned > index;
+    static std::vector<std::atomic<Node*>*> storage;
     static thread_local class HPlocalStorage{
     public:
         HPlocalStorage() :
         _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1),
-        _dcount(0), _dlist(std::vector<Node*>(THREADS_COUNT+1)), HP(std::vector<std::atomic<Node*>>(1)) {}
+        _dcount(0), _dlist(std::vector<std::atomic<Node*>>(THREADS_COUNT+1)), HP(std::vector<std::atomic<Node*>>(1)) {
+            indexInGlobal = HPGuard::index.load();
+            HPGuard::storage[indexInGlobal] =
+        }
 
         unsigned _numThreads;
         unsigned _maxHPcount;
@@ -40,8 +58,9 @@ private:
         unsigned _batchSize;
 
         std::vector<std::atomic<Node*>> HP;
-        std::vector<Node*> _dlist;
+        std::vector<std::atomic<Node*>> _dlist;
         unsigned _dcount;
+        unsigned indexInGlobal;
     } localStorage;
 
 
