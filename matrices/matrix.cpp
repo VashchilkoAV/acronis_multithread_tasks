@@ -134,6 +134,10 @@ BlockedMatrix Multiply(const BlockedMatrix &left, const BlockedMatrix &right, un
         }
     };
 
+    if (numThreads > left._numRows) {
+        numThreads = left._numRows; //decreasing numThreads in order not to have threads with empty job
+    }
+
     if (numThreads > 1) {
         std::vector<std::thread> workersPool(numThreads-1);
         auto ranges = MakeRanges(left._numRows, numThreads);
