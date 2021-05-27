@@ -1,6 +1,7 @@
 #include <iostream>
 #include <atomic>
 #include <vector>
+#include <set>
 
 constexpr unsigned THREADS_COUNT = 4;
 
@@ -14,10 +15,12 @@ struct Node{
 
 class HPGuard{
 public:
-    HPGuard() : _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1){}
+    HPGuard() : _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1){
+        storage = std::vector<std::atomic<Node*>*>(THREADS_COUNT);
+    }
     const unsigned limit = THREADS_COUNT+1;
-    Node * Protect(Node* node) {
-        localStorage.HP[0].store(node);
+    static Node * Protect(Node* node) {
+        localStorage.HP[0].store(node); //todo: implement the way to work with multiple hazard pointers
         return localStorage.HP[0].load();
     };
 
@@ -30,7 +33,37 @@ public:
         }
         localStorage._dcount++;
         if (localStorage._dcount == _batchSize) {
+            std::set<Node*> _expired;
+            std::set<Node*> _protected;
+            std::set<Node*> _toDelete;
 
+            for (unsigned i = 0; i < _batchSize; i++) {
+                _expired.insert(localStorage._dlist[i].load());
+            }
+
+            for (unsigned i = 0; i < index.load(); i++) {
+                std::atomic<Node*> *local = storage[i];
+                for (unsigned j = 0; j < _maxHPcount; j++) {
+                    _protected.insert(local[j].load());
+                }
+            }
+
+            for (auto& item : _expired) {
+                if (_protected.find(item) == _protected.end()) {
+                    _toDelete.insert(item);
+                }
+            }
+
+            for (auto& item: _toDelete) {
+                delete item;
+            }
+
+            for (unsigned i = 0; i < _batchSize; i++) {
+                if (_toDelete.find(localStorage._dlist[i].load()) != _toDelete.end()) {
+                    localStorage._dlist[i].store(nullptr);
+                    localStorage._dcount--;
+                }
+            }
         }
     }
 
@@ -49,7 +82,15 @@ private:
         _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1),
         _dcount(0), _dlist(std::vector<std::atomic<Node*>>(THREADS_COUNT+1)), HP(std::vector<std::atomic<Node*>>(1)) {
             indexInGlobal = HPGuard::index.load();
-            HPGuard::storage[indexInGlobal] =
+            HPGuard::storage[indexInGlobal] = &HP[0];
+            for (unsigned i = 0; i < _batchSize; i++) {
+                _dlist[i].store(nullptr);
+            }
+            index.fetch_add(1);
+        }
+
+        ~HPlocalStorage() {
+            HPGuard::storage[indexInGlobal] = nullptr;
         }
 
         unsigned _numThreads;
@@ -92,7 +133,7 @@ public:
 
 class Stack{
 public:
-    Stack() {
+    Stack() : guard(HPGuard()){
         _top.store(nullptr);
     }
 
@@ -111,7 +152,6 @@ public:
     }
 
     int Pop() {
-        HPGuard guard();
         Backoff backoff;
         while(true) {
             Node * oldTop = guard.Protect(_top.load());
@@ -130,7 +170,7 @@ public:
 
 private:
 
-
+    HPGuard guard;
     std::atomic<Node*> _top;
 };
 
