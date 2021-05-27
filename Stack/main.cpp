@@ -130,9 +130,9 @@ public:
     }
 };
 
-//thread_local HPGuard::HPlocalStorage;
-HPGuard::index(0);
-HPGuard::storage(std::vector<std::atomic<Node*>*>(THREADS_COUNT));
+thread_local HPGuard::HPlocalStorage HPGuard::localStorage;
+std::atomic<unsigned > HPGuard::index(0);
+std::vector<std::atomic<Node*>*>  HPGuard::storage = std::vector<std::atomic<Node*>*>(THREADS_COUNT);
 
 class Stack{
 public:
