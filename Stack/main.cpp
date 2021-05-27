@@ -3,8 +3,11 @@
 #include <vector>
 #include <set>
 #include <thread>
+#include <mutex>
 
 constexpr unsigned THREADS_COUNT = 4;
+
+std::atomic<int> deleted(0);
 
 struct Node{
     std::atomic<Node*> prev;
@@ -54,6 +57,7 @@ public:
             }
 
             for (auto& item: _toDelete) {
+                deleted.fetch_add(1);
                 delete item;
             }
 
@@ -72,6 +76,7 @@ public:
     unsigned _HPcount;
     unsigned _batchSize;
 
+    static std::mutex mut;
 
     static std::atomic<unsigned > index;
     static std::vector<std::atomic<Node*>*> storage;
@@ -80,6 +85,7 @@ public:
         HPlocalStorage() :
         _numThreads(THREADS_COUNT), _maxHPcount(1), _HPcount(THREADS_COUNT), _batchSize(THREADS_COUNT+1),
         _dcount(0), _dlist(std::vector<std::atomic<Node*>>(THREADS_COUNT+1)), HP(std::vector<std::atomic<Node*>>(1)) {
+            std::lock_guard<std::mutex> lock(HPGuard::mut);
             indexInGlobal = HPGuard::index.load();
             HPGuard::storage[indexInGlobal] = &HP[0];
             for (unsigned i = 0; i < _batchSize; i++) {
@@ -133,6 +139,7 @@ public:
 thread_local HPGuard::HPlocalStorage HPGuard::localStorage;
 std::atomic<unsigned > HPGuard::index(0);
 std::vector<std::atomic<Node*>*>  HPGuard::storage = std::vector<std::atomic<Node*>*>(THREADS_COUNT);
+std::mutex HPGuard::mut;
 
 class Stack{
 public:
@@ -164,7 +171,9 @@ public:
 
             Node * newTop = oldTop->prev;//.load(std::memory_order_relaxed);
             if (_top.compare_exchange_weak(oldTop, newTop, std::memory_order_acquire, std::memory_order_relaxed)) {
-                return oldTop->payload;
+                int val = oldTop->payload;
+                guard.RetireNode(oldTop);
+                return val;
             }
             backoff();
         }
@@ -180,15 +189,41 @@ private:
 
 
 int main() {
+
     Stack stack;
-    stack.Push(1);
-    stack.Push(2);
-    stack.Push(3);
-    std::cout << stack.Pop() <<"\n";
-    std::cout << stack.Pop() <<"\n";
-    std::cout << stack.Pop() <<"\n";
-    std::cout << stack.Pop() <<"\n";
-    std::cout << stack.Pop() <<"\n";
-    std::cout << "Hello, World!" << std::endl;
+
+    auto task = [&](int num) {
+        for (int i = 0; i < 10; ++i) {
+            stack.Push(i);
+        }
+        stack.Push(1);
+        stack.Push(2);
+        stack.Push(2);;
+
+        for (int i = 0; i < 10; ++i) {
+            auto item = stack.Pop();
+            std::cout << item << std::endl;
+        }
+        for (int i = 0; i < 10; ++i) {
+            stack.Push(i);
+            auto item = stack.Pop();
+            std::cout << item << std::endl;
+        }
+    };
+
+
+    std::vector<std::thread> workers(THREADS_COUNT-1);
+    int cnt = 0;
+    for (auto& worker : workers) {
+        worker = std::thread(task, ++cnt);
+    }
+
+    for (auto& worker : workers) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
+
+    std::cout << "deleted " << deleted;
     return 0;
 }
